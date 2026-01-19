@@ -52,12 +52,24 @@ public sealed class OutboxDispatcher : BackgroundService
                     }
                 }
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // normal shutdown
+                break;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Outbox dispatcher loop failed");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
     }
 }

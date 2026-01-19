@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ProiectPSSC.Application.Messaging;
+using ProiectPSSC.Domain.Billing;
 using ProiectPSSC.Domain.Events;
 using ProiectPSSC.Infrastructure.Persistence;
 using ProiectPSSC.Infrastructure.Persistence.Entities;
@@ -18,15 +19,45 @@ public sealed class OnOrderPlacedCreateInvoice : IEventHandler<OrderPlaced>
 
     public async Task HandleAsync(OrderPlaced ev, CancellationToken ct)
     {
-        // minimal invoice generation: create invoice id and publish InvoiceCreated to outbox
+        // Idempotency: don't create multiple invoices for the same order.
+        var exists = await _db.Invoices
+            .AsNoTracking()
+            .AnyAsync(i => i.OrderId == ev.OrderId, ct);
+
+        if (exists)
+            return;
+
+        var order = await _db.Orders
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == ev.OrderId, ct);
+
+        if (order is null)
+            return; // order missing; nothing to bill
+
         var invoiceId = Guid.NewGuid();
+        var invoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{invoiceId.ToString()[..8].ToUpperInvariant()}";
+        var dueDate = DateTimeOffset.UtcNow.AddDays(14);
+
+        var lines = order.Lines.Select(l => new InvoiceLine(l.ProductCode, l.Quantity, l.UnitPrice)).ToList();
+
+        var invoice = Invoice.Create(
+            invoiceId: invoiceId,
+            number: invoiceNumber,
+            orderId: order.Id,
+            billingEmail: order.CustomerEmail,
+            currency: Currency.RON,
+            dueDate: dueDate,
+            lines: lines
+        );
+
+        _db.Invoices.Add(invoice);
 
         var invoiceCreated = new InvoiceCreated(
             EventId: Guid.NewGuid(),
             OccurredAt: DateTimeOffset.UtcNow,
             InvoiceId: invoiceId,
-            OrderId: ev.OrderId,
-            Amount: ev.Total
+            OrderId: order.Id,
+            Amount: invoice.Amount
         );
 
         _db.OutboxEvents.Add(new OutboxEventEntity

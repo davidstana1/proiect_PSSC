@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ProiectPSSC.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ProiectPSSC.Infrastructure.Persistence;
 namespace ProiectPSSC.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260119183354_AddInvoices")]
+    partial class AddInvoices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,27 +32,13 @@ namespace ProiectPSSC.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("BillingEmail")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("billing_email");
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("amount");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<int>("Currency")
-                        .HasColumnType("integer")
-                        .HasColumnName("currency");
-
-                    b.Property<DateTimeOffset>("DueDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("due_date");
-
-                    b.Property<string>("Number")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("number");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
@@ -60,9 +49,6 @@ namespace ProiectPSSC.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Number")
-                        .IsUnique();
 
                     b.HasIndex("OrderId")
                         .IsUnique();
@@ -128,36 +114,6 @@ namespace ProiectPSSC.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProcessedAt");
 
                     b.ToTable("outbox_events", (string)null);
-                });
-
-            modelBuilder.Entity("ProiectPSSC.Domain.Billing.Invoice", b =>
-                {
-                    b.OwnsMany("ProiectPSSC.Domain.Billing.InvoiceLine", "Lines", b1 =>
-                        {
-                            b1.Property<Guid>("invoice_id")
-                                .HasColumnType("uuid");
-
-                            b1.Property<string>("ProductCode")
-                                .HasColumnType("text")
-                                .HasColumnName("product_code");
-
-                            b1.Property<int>("Quantity")
-                                .HasColumnType("integer")
-                                .HasColumnName("quantity");
-
-                            b1.Property<decimal>("UnitPrice")
-                                .HasColumnType("numeric")
-                                .HasColumnName("unit_price");
-
-                            b1.HasKey("invoice_id", "ProductCode");
-
-                            b1.ToTable("invoice_lines", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("invoice_id");
-                        });
-
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("ProiectPSSC.Domain.Orders.Order", b =>

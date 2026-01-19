@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProiectPSSC.Domain.Billing;
 using ProiectPSSC.Domain.Orders;
 using ProiectPSSC.Infrastructure.Persistence.Entities;
 
@@ -9,6 +10,7 @@ public sealed class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<OutboxEventEntity> OutboxEvents => Set<OutboxEventEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -35,6 +37,43 @@ public sealed class AppDbContext : DbContext
                 lb.Property(x => x.UnitPrice).HasColumnName("unit_price");
 
                 lb.HasKey("order_id", nameof(OrderLine.ProductCode));
+            });
+        });
+
+        modelBuilder.Entity<Invoice>(b =>
+        {
+            b.ToTable("invoices");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Id).HasColumnName("id");
+            b.Property(x => x.Number).HasColumnName("number").IsRequired();
+
+            b.Property(x => x.OrderId)
+                .HasConversion(v => v.Value, v => new OrderId(v))
+                .HasColumnName("order_id")
+                .IsRequired();
+
+            b.Property(x => x.BillingEmail).HasColumnName("billing_email").IsRequired();
+            b.Property(x => x.Currency).HasColumnName("currency").IsRequired();
+            b.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            b.Property(x => x.DueDate).HasColumnName("due_date").IsRequired();
+            b.Property(x => x.Status).HasColumnName("status").IsRequired();
+
+            // Amount is computed from lines; we don't store it as a column.
+            b.Ignore(x => x.Amount);
+
+            b.HasIndex(x => x.OrderId).IsUnique();
+            b.HasIndex(x => x.Number).IsUnique();
+
+            b.OwnsMany(x => x.Lines, lb =>
+            {
+                lb.ToTable("invoice_lines");
+                lb.WithOwner().HasForeignKey("invoice_id");
+                lb.Property(x => x.ProductCode).HasColumnName("product_code");
+                lb.Property(x => x.Quantity).HasColumnName("quantity");
+                lb.Property(x => x.UnitPrice).HasColumnName("unit_price");
+
+                lb.HasKey("invoice_id", nameof(InvoiceLine.ProductCode));
             });
         });
 
