@@ -1,0 +1,6 @@
+@ProiectPSSC.Api_HostAddress = http://localhost:5144
+
+GET {{ProiectPSSC.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
