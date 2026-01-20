@@ -28,7 +28,6 @@ public sealed class OnOrderPlacedCreateInvoice : IEventHandler<OrderPlaced>
             return;
 
         var order = await _db.Orders
-            .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == ev.OrderId, ct);
 
         if (order is null)
@@ -51,6 +50,9 @@ public sealed class OnOrderPlacedCreateInvoice : IEventHandler<OrderPlaced>
         );
 
         _db.Invoices.Add(invoice);
+
+        // Mark the order as invoiced
+        order.MarkAsInvoiced();
 
         var invoiceCreated = new InvoiceCreated(
             EventId: Guid.NewGuid(),

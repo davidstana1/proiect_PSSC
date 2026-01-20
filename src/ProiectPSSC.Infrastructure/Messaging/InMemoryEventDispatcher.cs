@@ -46,6 +46,22 @@ public sealed class InMemoryEventDispatcher : IEventDispatcher
                         await handler.HandleAsync(ev, ct);
                     break;
                 }
+            case "OrderUpdated":
+                {
+                    var ev = JsonSerializer.Deserialize<Domain.Events.OrderUpdated>(payloadJson)!;
+                    var handler = sp.GetService<IEventHandler<Domain.Events.OrderUpdated>>();
+                    if (handler is not null)
+                        await handler.HandleAsync(ev, ct);
+                    break;
+                }
+            case "OrderShipped":
+                {
+                    var ev = JsonSerializer.Deserialize<Domain.Events.OrderShipped>(payloadJson)!;
+                    var handler = sp.GetService<IEventHandler<Domain.Events.OrderShipped>>();
+                    if (handler is not null)
+                        await handler.HandleAsync(ev, ct);
+                    break;
+                }
             default:
                 throw new InvalidOperationException($"Unknown event type '{eventType}'");
         }

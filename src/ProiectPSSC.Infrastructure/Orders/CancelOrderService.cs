@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ProiectPSSC.Application.Orders;
 using ProiectPSSC.Domain.Common;
 using ProiectPSSC.Domain.Events;
+using ProiectPSSC.Domain.Orders;
 using ProiectPSSC.Infrastructure.Persistence;
 using ProiectPSSC.Infrastructure.Persistence.Entities;
 
@@ -19,7 +20,8 @@ public sealed class CancelOrderService : ICancelOrderService
 
     public async Task<Result<CancelOrderResponse>> CancelAsync(Guid orderId, string? reason, CancellationToken ct)
     {
-        var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id.Value == orderId, ct);
+        var id = new OrderId(orderId);
+        var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id, ct);
         if (order is null)
             return Result<CancelOrderResponse>.Fail(Error.NotFound($"Order '{orderId}' not found"));
 
