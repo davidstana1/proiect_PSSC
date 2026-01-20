@@ -1,3 +1,4 @@
+using ProiectPSSC.Domain.Common;
 using ProiectPSSC.Domain.Orders;
 
 namespace ProiectPSSC.Domain.Billing;
@@ -45,4 +46,30 @@ public sealed class Invoice
 
     public static Invoice Create(Guid invoiceId, string number, OrderId orderId, string billingEmail, Currency currency, DateTimeOffset dueDate, IEnumerable<InvoiceLine> lines)
         => new(invoiceId, number, orderId, billingEmail, currency, dueDate, lines);
+
+    /// <summary>
+    /// Updates the invoice lines to reflect order changes.
+    /// Only allowed when invoice is in Created status.
+    /// </summary>
+    public Result UpdateLines(IEnumerable<InvoiceLine> newLines)
+    {
+        if (Status != InvoiceStatus.Created)
+            return Result.Fail(Error.Conflict($"Cannot update invoice in status {Status}"));
+
+        _lines.Clear();
+        _lines.AddRange(newLines);
+        return Result.Ok();
+    }
+
+    /// <summary>
+    /// Cancels the invoice.
+    /// </summary>
+    public Result Cancel()
+    {
+        if (Status == InvoiceStatus.Cancelled)
+            return Result.Fail(Error.Conflict("Invoice already cancelled"));
+
+        Status = InvoiceStatus.Cancelled;
+        return Result.Ok();
+    }
 }

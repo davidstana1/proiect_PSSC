@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using ProiectPSSC.Application.Billing;
 using ProiectPSSC.Application.Messaging;
 using ProiectPSSC.Application.Orders;
+using ProiectPSSC.Application.Shipping;
 using ProiectPSSC.Infrastructure.Billing;
 using ProiectPSSC.Infrastructure.Messaging;
 using ProiectPSSC.Infrastructure.Outbox;
 using ProiectPSSC.Infrastructure.Orders;
 using ProiectPSSC.Infrastructure.Persistence;
+using ProiectPSSC.Infrastructure.Shipping;
 using ProiectPSSC.Infrastructure.Workflow.Billing;
 using ProiectPSSC.Infrastructure.Workflow.Shipping;
 
@@ -23,12 +25,16 @@ builder.Services.AddDbContext<AppDbContext>(opt => opt.UseNpgsql(cs));
 // Application services
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ICancelOrderService, CancelOrderService>();
+builder.Services.AddScoped<IUpdateOrderService, UpdateOrderService>();
+builder.Services.AddScoped<IShipOrderService, ShipOrderService>();
 builder.Services.AddScoped<IInvoiceQueries, InvoiceQueries>();
+builder.Services.AddScoped<IShipmentQueries, ShipmentQueries>();
 builder.Services.AddSingleton<IEventDispatcher, InMemoryEventDispatcher>();
 
 // Event handlers (workflows)
 builder.Services.AddScoped<IEventHandler<ProiectPSSC.Domain.Events.OrderPlaced>, OnOrderPlacedCreateInvoice>();
 builder.Services.AddScoped<IEventHandler<ProiectPSSC.Domain.Events.InvoiceCreated>, OnInvoiceCreatedScheduleShipment>();
+builder.Services.AddScoped<IEventHandler<ProiectPSSC.Domain.Events.OrderUpdated>, OnOrderUpdatedUpdateInvoice>();
 
 // Outbox background worker
 builder.Services.AddHostedService<OutboxDispatcher>();
@@ -77,9 +83,10 @@ app.MapGet("/orders", async (AppDbContext db, CancellationToken ct) =>
 
 app.MapGet("/orders/{orderId:guid}", async (Guid orderId, AppDbContext db, CancellationToken ct) =>
 {
+    var id = new ProiectPSSC.Domain.Orders.OrderId(orderId);
     var order = await db.Orders
         .AsNoTracking()
-        .Where(o => o.Id.Value == orderId)
+        .Where(o => o.Id == id)
         .Select(o => new
         {
             orderId = o.Id.Value,
@@ -130,6 +137,50 @@ app.MapGet("/orders/{orderId:guid}/invoice", async (Guid orderId, IInvoiceQuerie
 .WithName("GetInvoiceByOrderId")
 .WithOpenApi();
 
+// PUT /orders/{id} - Update order
+app.MapPut("/orders/{orderId:guid}", async (Guid orderId, UpdateOrderRequest req, IUpdateOrderService svc, CancellationToken ct) =>
+{
+    var result = await svc.UpdateAsync(orderId, req, ct);
+    return result.IsSuccess
+        ? Results.Ok(result.Value)
+        : result.Error?.Code == "not_found"
+            ? Results.NotFound(new { error = result.Error })
+            : Results.BadRequest(new { error = result.Error });
+})
+.WithName("UpdateOrder")
+.WithOpenApi();
+
+// POST /orders/{id}/ship - Ship/release order
+app.MapPost("/orders/{orderId:guid}/ship", async (Guid orderId, ShipOrderRequest req, IShipOrderService svc, CancellationToken ct) =>
+{
+    var result = await svc.ShipAsync(orderId, req, ct);
+    return result.IsSuccess
+        ? Results.Ok(result.Value)
+        : result.Error?.Code == "not_found"
+            ? Results.NotFound(new { error = result.Error })
+            : Results.BadRequest(new { error = result.Error });
+})
+.WithName("ShipOrder")
+.WithOpenApi();
+
+// GET /orders/{id}/shipment - Get shipment details
+app.MapGet("/orders/{orderId:guid}/shipment", async (Guid orderId, IShipmentQueries queries, CancellationToken ct) =>
+{
+    var result = await queries.GetByOrderIdAsync(orderId, ct);
+    return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(new { error = result.Error });
+})
+.WithName("GetShipmentByOrderId")
+.WithOpenApi();
+
+// GET /shipments/{id} - Get shipment by id
+app.MapGet("/shipments/{shipmentId:guid}", async (Guid shipmentId, IShipmentQueries queries, CancellationToken ct) =>
+{
+    var result = await queries.GetByIdAsync(shipmentId, ct);
+    return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(new { error = result.Error });
+})
+.WithName("GetShipmentById")
+.WithOpenApi();
+
 // Apply migrations automatically (dev-friendly). For production you'd do it separately.
 using (var scope = app.Services.CreateScope())
 {
@@ -140,3 +191,6 @@ using (var scope = app.Services.CreateScope())
 app.Run();
 
 public sealed record CancelOrderRequest(string? Reason);
+
+// For WebApplicationFactory in integration tests
+public partial class Program { }

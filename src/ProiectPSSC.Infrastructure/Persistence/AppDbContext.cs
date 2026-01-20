@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ProiectPSSC.Domain.Billing;
 using ProiectPSSC.Domain.Orders;
+using ProiectPSSC.Domain.Shipping;
 using ProiectPSSC.Infrastructure.Persistence.Entities;
 
 namespace ProiectPSSC.Infrastructure.Persistence;
@@ -11,6 +12,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<OutboxEventEntity> OutboxEvents => Set<OutboxEventEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -75,6 +77,25 @@ public sealed class AppDbContext : DbContext
 
                 lb.HasKey("invoice_id", nameof(InvoiceLine.ProductCode));
             });
+        });
+
+        modelBuilder.Entity<Shipment>(b =>
+        {
+            b.ToTable("shipments");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Id).HasColumnName("id");
+
+            b.Property(x => x.OrderId)
+                .HasConversion(v => v.Value, v => new OrderId(v))
+                .HasColumnName("order_id")
+                .IsRequired();
+
+            b.Property(x => x.TrackingNumber).HasColumnName("tracking_number");
+            b.Property(x => x.Carrier).HasColumnName("carrier");
+            b.Property(x => x.ShippedAt).HasColumnName("shipped_at").IsRequired();
+
+            b.HasIndex(x => x.OrderId).IsUnique();
         });
 
         modelBuilder.Entity<OutboxEventEntity>(b =>
